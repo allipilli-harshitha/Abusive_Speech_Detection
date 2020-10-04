@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+   <head>
+      <meta charset="UTF-8">
+      <title>Simple Recorder</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+       <link rel="stylesheet" type="text/css" href= "{{ url_for('static',filename='styles/style.css') }}">
+   </head>
+   <body style="background-color:Lightsteelblue;">
+      <h1 style="text-align:center;">ABUSIVE SPEECH DETECTOR</h1>
+      <div id="controls">
+         <button id="recordButton"><a href='/record/'>Record</a></button>
+         <button id="stopButton" disabled>Stop</button>
+      </div>
+      <div id="formats">Format: start recording to see sample rate</div>
+      <ol id="recordingsList"></ol>
+
+      <div id="container">
+      	<video autoplay="true" id="videoElement">
+
+      	</video>
+      </div>
+      <!-- inserting these scripts at the end to be able to use all the elements in the DOM -->
+      <script src="https://cdn.rawgit.com/mattdiamond/Recorderjs/08e7abd9/dist/recorder.js"></script>
+      <script>
+         //webkitURL is deprecated but nevertheless
+         URL = window.URL || window.webkitURL;
+         var gumStream;
+         //stream from getUserMedia()
+         var rec;
+         //Recorder.js object
+         var input;
+         //MediaStreamAudioSourceNode we'll be recording
+         var interval;
+         // shim for AudioContext when it's not avb.
+         var AudioContext = window.AudioContext || window.webkitAudioContext;
+         var audioContext
+         var autoDownloadVal = true;
+         //audio context to help us record
+         var recordButton = document.getElementById("recordButton");
+         var stopButton = document.getElementById("stopButton");
+         var autoDownloadButton = document.getElementById("allowAutoDownload");
+
+         //add events to those 2 buttons
+         recordButton.addEventListener("click", startRecording);
+         stopButton.addEventListener("click", clearRecording);
+
+         function autoDownload() {
+         if (autoDownloadButton.innerHTML=="AUTO DOWNLOAD ON")
+         {
+         autoDownloadButton.innerHTML  = "AUTO DOWNLOAD OFF";
+         autoDownloadVal = true;
+         } else {
+         autoDownloadButton.innerHTML  = "AUTO DOWNLOAD ON";
+         autoDownloadVal = false;
+         }
+
+         }
+
+
+         function setRecordingInterval(stream){
+            interval = setInterval(function(){
+                recordInterval(stream);
+                setTimeout(function(){
+                    stopRecording()
+                },5000)
+            },6000);
+         }
+
+
+         function recordInterval(stream) {
+             console.log("getUserMedia() success, stream created, initializing Recorder.js ...");
+             audioContext = new AudioContext();
+             //update the format
+             document.getElementById("formats").innerHTML = "Format: 1 channel pcm @ " + audioContext.sampleRate / 1000 + "kHz"
+             /*  assign to gumStream for later use  */
+             gumStream = stream;
+             /* use the stream */
+             input = audioContext.createMediaStreamSource(stream);
+             /*
+             Create the Recorder object and configure to record mono sound (1 channel)
+             Recording 2 channels  will double the file size
+         */
+             rec = new Recorder(input,{
+                 numChannels: 1
+             })
+
+             //start the recording process
+             return rec.record();
+
+             //create the wav blob and pass it on to createDownloadLink
+             //  rec.exportWAV(createDownloadLink);
+         }
+
+
+         function clearRecording() {
+             gumStream.getAudioTracks()[0].stop();
+             clearInterval(interval);
+         }
+
+
+         function startRecording() {
+             /*
+             Simple constraints object, for more advanced audio features see
+             https://addpipe.com/blog/audio-constraints-getusermedia/
+         */
+             var video = document.querySelector("#videoElement");
+             var constraint1 = {
+                 audio: true
+                //a change has made
+             }
+             var constraint2 = {
+                 video: true
+                //a change has made
+             }
+
+             /*
+             Disable the record button until we get a success or fail from getUserMedia()
+         */
+
+             recordButton.disabled = true;
+             stopButton.disabled = false;
+          
+            navigator.mediaDevices.getUserMedia(constraint2).then(function(stream) {
+                video.srcObject = stream;
+              }).catch(function (err0r){
+                  //enable the record button if getUserMedia() fails
+                  recordButton.disabled = false;
+                  stopButton.disabled = true;
+              });
+
+             /*
+             We're using the standard promise based getUserMedia()
+             https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia
+         */
+
+             navigator.mediaDevices.getUserMedia(constraint1).then(function(stream) {
+                 //autoDownloadValue = true;
+                 setRecordingInterval(stream);
+             }).catch(function(err) {
+                 //enable the record button if getUserMedia() fails
+                 recordButton.disabled = false;
+                 stopButton.disabled = true;
+              });
+         }
+
+      
+
+         function stopRecording() {
+             console.log("stopButton clicked");
+
+             //disable the stop button, enable the record too allow for new recordings
+             stopButton.disabled = false;
+             recordButton.disabled = false;
+             //reset button just in case the recording is stopped while paused
+             //tell the recorder to stop the recording
+             rec.stop();
+             //create the wav blob and pass it on to createDownloadLink
+             rec.exportWAV(createDownloadLink);
+         }
+
+
+         function createDownloadLink(blob) {
+
+             var url = URL.createObjectURL(blob);
+             var au = document.createElement('audio');
+             var li = document.createElement('li');
+             var link = document.createElement('a');
+
+             //name of .wav file to use during upload and download (without extendion)
+             var counter  = 0;
+             var filename = counter;
+
+             //add controls to the <audio> element
+             au.controls = true;
+             au.src = url;
+
+             //save to disk link
+             link.href = url;
+             link.download = filename + ".wav";
+             //download forces the browser to download the file using the  filename
+             link.innerHTML = "Download";
+
+             //add the new audio element to li
+             li.appendChild(au);
+
+             //add the filename to the li
+             li.appendChild(document.createTextNode(filename + ".wav "))
+
+             //add the save to disk link to li
+
+         if (autoDownloadVal) {
+         link.click();
+         } else {
+                 li.appendChild(link);
+         }
+             //add the upload link to li
+             //add the li element to the ol
+             recordingsList.appendChild(li);
+         }
+      </script>
+   </body>
+</html>
