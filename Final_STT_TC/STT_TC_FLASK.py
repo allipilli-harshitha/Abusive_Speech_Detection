@@ -36,7 +36,7 @@ import time
 app = Flask(__name__)
 app.config['MYSQL_USER'] = 'root'
 app.config['MYSQL_DATABASE'] = 'abusive_words'
-app.config['MYSQL_PASSWORD'] = 'Harshi@9903'
+app.config['MYSQL_PASSWORD'] = 'password'
 mysql = MySQL(app)
 
 #required functions
